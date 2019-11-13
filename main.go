@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/tidwall/gjson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -49,8 +54,39 @@ func (p *Product) product_name_api(u string) {
 
 }
 
-func (p *Product) product_price_api(i string) {
+func (p *Product) product_price_query(i string) {
+	// Connect to the mongodb docker instance, assuming with have a docker container labeled "mongo" on port 27017
+	clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017")
 
+	//Connect to the db
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if err != nil {
+		log.Fatal("mongodb connection failed: ", err)
+	}
+
+	// Check the connection
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		log.Fatal("db connection is failing: ", err)
+	}
+
+	// Set up the collection
+	collection := client.Database("product_prices").Collection("product")
+
+	// Take the key and convert it for bson
+	pid, _ := primitive.ObjectIDFromHex(i)
+
+	// Create a result and write to it
+	var result string
+	collection.FindOne(context.TODO(), bson.M{"product_id": pid}).Decode(&result)
+
+	// Write the result to product
+	p.price = result
+
+}
+
+func update_price(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "method: %v", r.Method)
 }
 
 func construct_product(w http.ResponseWriter, r *http.Request) {
@@ -64,15 +100,15 @@ func construct_product(w http.ResponseWriter, r *http.Request) {
 	// Allocate memory for a new product
 	product := new(Product)
 
+	// Assign everything
 	product.id = vars["id"]
 	product.product_name_api(redsky_url)
+	product.product_price_query(vars["id"])
+
+	// Return everything
 	fmt.Fprintf(w, "Name: %v", product.name)
 	fmt.Fprintf(w, "ID: %v", product.id)
-	fmt.Fprintf(w, "Stuff: %v", r.Method)
-}
-
-func update_price(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "method: %v", r.Method)
+	fmt.Fprintf(w, "Price: %v", product.price)
 }
 
 func main() {
@@ -86,7 +122,7 @@ func main() {
 	// If searching for product by id, be informative
 	router.HandleFunc("/product/{id:[0-9]+}", construct_product).Methods("GET")
 
-	// If updating a products price, go for it
+	// If updating a product price, go for it
 	router.HandleFunc("/product/{id:[0-9]+}", update_price).Methods("PUT")
 
 	// Serve up everything on localhost:8080

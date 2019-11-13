@@ -35,6 +35,7 @@ func (p *Product) product_name_api(u string) {
 	// Read in the data using io
 	unstring_data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
+
 		log.Fatal("ioutil readall failed: ", err)
 	}
 
@@ -44,7 +45,11 @@ func (p *Product) product_name_api(u string) {
 	// Big thanks to Josh Baker for making this json parser with syntax that actually makes sense
 	product_name := gjson.Get(data, "product.item.product_description.title").String()
 
-	p.name = product_name
+	p.name = string(product_name)
+
+}
+
+func (p *Product) product_price_api(i string) {
 
 }
 
@@ -56,23 +61,33 @@ func construct_product(w http.ResponseWriter, r *http.Request) {
 	// Let everyone know things went okay
 	w.WriteHeader(http.StatusOK)
 
-	//fmt.Fprintf(w, "Product: %v\n", vars["id"])
 	// Allocate memory for a new product
 	product := new(Product)
 
 	product.id = vars["id"]
 	product.product_name_api(redsky_url)
-	fmt.Fprintf(w, "", product.name)
+	fmt.Fprintf(w, "Name: %v", product.name)
+	fmt.Fprintf(w, "ID: %v", product.id)
+	fmt.Fprintf(w, "Stuff: %v", r.Method)
+}
+
+func update_price(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "method: %v", r.Method)
 }
 
 func main() {
+
+	// The router is the object through which all power flows
 	router := mux.NewRouter().StrictSlash(true)
 
 	// If just a slash, be welcoming
 	router.HandleFunc("/", home)
 
 	// If searching for product by id, be informative
-	router.HandleFunc("/product/{id:[0-9]+}", construct_product)
+	router.HandleFunc("/product/{id:[0-9]+}", construct_product).Methods("GET")
+
+	// If updating a products price, go for it
+	router.HandleFunc("/product/{id:[0-9]+}", update_price).Methods("PUT")
 
 	// Serve up everything on localhost:8080
 	log.Fatal(http.ListenAndServe(":8080", router))

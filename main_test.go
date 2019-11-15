@@ -17,7 +17,7 @@ func TestInsertProductEndpoint(t *testing.T) {
 	var testInsertBuffer = []byte(`{
 		"productid":"123", 
 		"productprice": "10.99",
-		"productcurrency": "USD",
+		"productcurrency": "USD"
 	}`)
 
 	// Create a new request

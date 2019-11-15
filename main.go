@@ -33,6 +33,7 @@ func init() {
 	// Get our api address to hit, here we're using a local mongodb docker container
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
 
+	// Try to connect and if failure, let me know
 	client, err = mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
 		log.Fatal("db didn't connect: ", err)
@@ -111,7 +112,7 @@ func GetProductEndpoint(response http.ResponseWriter, request *http.Request) {
 }
 
 func InsertProductEndpoint(response http.ResponseWriter, request *http.Request) {
-	fmt.Print("InsertPoduct called")
+	fmt.Println("InsertPoduct called")
 
 	// Set the header
 	response.Header().Set("content-type", "application/json")

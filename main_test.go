@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,14 +14,14 @@ func TestGetProductEndpoint(t *testing.T) {
 func TestInsertProductEndpoint(t *testing.T) {
 
 	// Byte test string for insert
-	var testInsertString = []byte(`{
+	var testInsertBuffer = []byte(`{
 		"productid":"123", 
 		"productprice": "10.99",
 		"productcurrency": "USD",
 	}`)
 
 	// Create a new request
-	req, err := http.NewRequest("POST", "/product/{id}", bytes.NewBuffer(testInsertString))
+	req, err := http.NewRequest("POST", "/product/123", bytes.NewBuffer(testInsertBuffer))
 	if err != nil {
 		t.Fatal("new request for insert test failed: ", err)
 	}
@@ -44,18 +43,6 @@ func TestInsertProductEndpoint(t *testing.T) {
 		t.Errorf("handler return a bad status code: GOT %v WANTED %v",
 			status, http.StatusOK)
 	}
-
-	// Compile a little regex
-	//_, err := regexp.Compile(".*")
-	if err != nil {
-		t.Fatal("regex failed to compile: ", err)
-	}
-
-	// Tell the tes0t what to expect
-	// expected := reg.ReplaceAll(`{}`)
-
-	fmt.Println(rr.Body.String())
-
 }
 
 func TestUpdateProductEndpoint(t *testing.T) {

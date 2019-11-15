@@ -1,31 +1,41 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/tidwall/gjson"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/tidwall/gjson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Because we have one example and I'm not totally sure on how the api url string is constructed, this will just be a constant. In the real world this would be constructed via arguments very closely to how the construct_product url is constructed and handled.
-const redsky_url string = "https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics"
+// Because we have one example and I'm not totally sure on how the api url string is constructed, this will just be a constant. In the real world this would be constructed via arguments.
+const redskyURL string = "https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics"
+
+// Mongo db client is going to be use a lot of places, and there's only one db we're hitting, so make it gobal
+var client *mongo.Client
 
 type Product struct {
-	id       string
-	name     string
-	price    string
-	currency string
+	ID              primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Productid       string             `json:"productid,omitempty" bson:"productid,omitempty"`
+	Productname     string             `json:"productname,omitempty" bson:"productname,omitempty"`
+	Productprice    string             `json:"productprice,omitempty" bson:"productprice,omitempty"`
+	ProductCurrency string             `json:"productcurrency,omitempty" bson:"productcurrency,omitempty"`
 }
 
-func home(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "welcome home!")
-}
+func (p *Product) ProductNameEndpoint(u string) {
+	fmt.Println("ProductName called")
 
-func (p *Product) product_name_api(u string) {
-
-	// Construct http request to the product info api. In this case the api address is a string constant, but in the real world this would be construct via another function
+	// Construct http request to the product info api. In this case the api address is a string constant, but in the real world this would be constructed via another function
 	response, err := http.Get(u)
 	if err != nil {
 		log.Fatal("product information api request failed: ", err)
@@ -33,63 +43,152 @@ func (p *Product) product_name_api(u string) {
 	defer response.Body.Close()
 
 	// Read in the data using io
-	unstring_data, err := ioutil.ReadAll(response.Body)
+	unstringData, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 
 		log.Fatal("ioutil readall failed: ", err)
 	}
 
 	// Stringify the data
-	data := string(unstring_data)
+	data := string(unstringData)
 
 	// Big thanks to Josh Baker for making this json parser with syntax that actually makes sense
-	product_name := gjson.Get(data, "product.item.product_description.title").String()
+	productName := gjson.Get(data, "product.item.product_description.title").String()
 
-	p.name = string(product_name)
-
-}
-
-func (p *Product) product_price_api(i string) {
+	p.Productname = string(productName)
 
 }
 
-func construct_product(w http.ResponseWriter, r *http.Request) {
+func GetProductEndpoint(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("GetProduct called")
 
-	// Grab all the variables passed
-	vars := mux.Vars(r)
+	// Set the header
+	response.Header().Set("content-type", "application/json")
 
-	// Let everyone know things went okay
-	w.WriteHeader(http.StatusOK)
+	// Grab the request parameters
+	params := mux.Vars(request)
 
-	// Allocate memory for a new product
+	// Grab the id from the request map
+	id := params["id"]
+
+	// Allocate a new product
 	product := new(Product)
 
-	product.id = vars["id"]
-	product.product_name_api(redsky_url)
-	fmt.Fprintf(w, "Name: %v", product.name)
-	fmt.Fprintf(w, "ID: %v", product.id)
-	fmt.Fprintf(w, "Stuff: %v", r.Method)
+	// Establish the db and collection we're going to use
+	collection := client.Database("target").Collection("products")
+
+	// Establish an acceptable timeout, defer the cancel
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Try finding the product by it's product id
+	err := collection.FindOne(ctx, Product{Productid: id}).Decode(&product)
+	product.ProductNameEndpoint(redskyURL)
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+		return
+	}
+
+	// Encode the response onto the product
+	json.NewEncoder(response).Encode(product)
+
 }
 
-func update_price(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "method: %v", r.Method)
+func InsertProductEndpoint(response http.ResponseWriter, request *http.Request) {
+	fmt.Print("InsertPoduct called")
+
+	// Set the header
+	response.Header().Set("content-type", "application/json")
+
+	// Allocate a new Product
+	product := new(Product)
+
+	// Provide a new decoder for the product we just allocated
+	json.NewDecoder(request.Body).Decode(&product)
+
+	// Establish the db and collection we're going to use
+	collection := client.Database("target").Collection("products")
+
+	// Set a timeout, defer the timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Grab everything and try inserting into the database
+	result, err := collection.InsertOne(ctx, product)
+	if err != nil {
+		log.Fatal("insert failed: ", err)
+	}
+
+	// Encode the result
+	json.NewEncoder(response).Encode(result)
+}
+
+func UpdateProductEndpoint(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("UpdateProduct called")
+
+	// Set the header
+	response.Header().Set("content-type", "application/json")
+
+	// Grab the request parameters
+	params := mux.Vars(request)
+
+	// Grab the id from the request map
+	id := params["id"]
+
+	// Allocate a new product
+	product := new(Product)
+
+	// Decode the request body and assign it to product
+	json.NewDecoder(request.Body).Decode(&product)
+
+	// Grab the new price
+	price := product.Productprice
+
+	update := bson.M{"$set": bson.M{"productprice": price}}
+
+	// Establish the db and collection we're going to use
+	collection := client.Database("target").Collection("products")
+
+	// Set a timeout, defer the timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	//
+	_, err := collection.UpdateOne(ctx, Product{Productid: id}, update)
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+		return
+	}
 }
 
 func main() {
 
-	// The router is the object through which all power flows
-	router := mux.NewRouter().StrictSlash(true)
+	// Get an error
+	var err error
 
-	// If just a slash, be welcoming
-	router.HandleFunc("/", home)
+	// Create a timeout, defer the cancel
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// If searching for product by id, be informative
-	router.HandleFunc("/product/{id:[0-9]+}", construct_product).Methods("GET")
+	// Get our api address to hit, here we're using a local mongodb docker container
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
 
-	// If updating a products price, go for it
-	router.HandleFunc("/product/{id:[0-9]+}", update_price).Methods("PUT")
+	// Try connecting and making a client
+	client, err = mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatal("db didn't connect: ", err)
+	}
 
-	// Serve up everything on localhost:8080
-	log.Fatal(http.ListenAndServe(":8080", router))
+	// Create a router through which traffic will flow
+	router := mux.NewRouter()
 
+	// Give it some places to go
+	router.HandleFunc("/product/{id}", InsertProductEndpoint).Methods("POST")
+	router.HandleFunc("/product/{id}", GetProductEndpoint).Methods("GET")
+	router.HandleFunc("/product/{id}", UpdateProductEndpoint).Methods("PUT")
+
+	//Serve up everything on port 8080
+	http.ListenAndServe(":8080", router)
 }

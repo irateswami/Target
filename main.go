@@ -19,10 +19,25 @@ import (
 )
 
 // Because we have one example and I'm not totally sure on how the api url string is constructed, this will just be a constant. In the real world this would be constructed via arguments.
-const redskyURL string = "https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics"
+var redskyURL string
 
 // Mongo db client is going to be use a lot of places, and there's only one db we're hitting, so make it gobal
 var client *mongo.Client
+
+func init() {
+
+	redskyURL = "https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics"
+
+	var err error
+
+	// Get our api address to hit, here we're using a local mongodb docker container
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+
+	client, err = mongo.Connect(context.Background(), clientOptions)
+	if err != nil {
+		log.Fatal("db didn't connect: ", err)
+	}
+}
 
 type Product struct {
 	ID              primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
@@ -165,22 +180,6 @@ func UpdateProductEndpoint(response http.ResponseWriter, request *http.Request) 
 
 func main() {
 
-	// Get an error
-	var err error
-
-	// Create a timeout, defer the cancel
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Get our api address to hit, here we're using a local mongodb docker container
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-
-	// Try connecting and making a client
-	client, err = mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatal("db didn't connect: ", err)
-	}
-
 	// Create a router through which traffic will flow
 	router := mux.NewRouter()
 
@@ -191,6 +190,10 @@ func main() {
 
 	//Serve up everything on port 8080
 	http.ListenAndServe(":8080", router)
+
+	// Create a timeout, defer the cancel
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	// Defer closing until we exit
 	defer client.Disconnect(ctx)

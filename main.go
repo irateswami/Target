@@ -32,11 +32,11 @@ type Product struct {
 	ProductCurrency string             `json:"productcurrency,omitempty" bson:"productcurrency,omitempty"`
 }
 
-func (p *Product) ProductNameEndpoint(u string) {
+func (p *Product) ProductNameEndpoint(id string) {
 	fmt.Println("ProductName called")
 
 	// Construct http request to the product info api. In this case the api address is a string constant, but in the real world this would be constructed via another function
-	response, err := http.Get(u)
+	response, err := http.Get(redskyURL)
 	if err != nil {
 		log.Fatal("product information api request failed: ", err)
 	}
@@ -111,7 +111,7 @@ func InsertProductEndpoint(response http.ResponseWriter, request *http.Request) 
 	collection := client.Database("target").Collection("products")
 
 	// Set a timeout, defer the timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 
 	// Grab everything and try inserting into the database
@@ -191,4 +191,7 @@ func main() {
 
 	//Serve up everything on port 8080
 	http.ListenAndServe(":8080", router)
+
+	// Defer closing until we exit
+	defer client.Disconnect(ctx)
 }

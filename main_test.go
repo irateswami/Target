@@ -51,4 +51,14 @@ func TestUpdateProductEndpoint(t *testing.T) {
 
 func TestProductNameEndpoint(t *testing.T) {
 
+	id := "12345"
+
+	product := new(Product)
+
+	product.ProductNameEndpoint(id)
+
+	if expected := "The Big Lebowski (Blu-ray)"; product.Productid != expected {
+		t.Errorf("product name endpoint failed: GOT %v, WANTED %v",
+			product.Productname, expected)
+	}
 }

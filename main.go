@@ -170,7 +170,7 @@ func UpdateProductEndpoint(response http.ResponseWriter, request *http.Request) 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	//
+	// Update the product, error out if something was amiss
 	_, err := collection.UpdateOne(ctx, Product{Productid: id}, update)
 	if err != nil {
 		response.WriteHeader(http.StatusInternalServerError)
@@ -189,7 +189,7 @@ func main() {
 	router.HandleFunc("/product/{id}", GetProductEndpoint).Methods("GET")
 	router.HandleFunc("/product/{id}", UpdateProductEndpoint).Methods("PUT")
 
-	//Serve up everything on port 8080
+	// Serve up everything on port 8080
 	http.ListenAndServe(":8080", router)
 
 	// Create a timeout, defer the cancel

@@ -9,6 +9,31 @@ import (
 
 func TestGetProductEndpoint(t *testing.T) {
 
+	var testGetBuffer = []byte(``)
+
+	// Create a new request
+	req, err := http.NewRequest("GET", "/product/123", bytes.NewBuffer(testGetBuffer))
+	if err != nil {
+		t.Fatal("new request for get test failed: ", err)
+	}
+
+	// Set the header so we know what we're dealing with
+	req.Header.Set("content-type", "application/json")
+
+	// Recorder to get the response
+	rr := httptest.NewRecorder()
+
+	// Handler is what's actually going to handle the call to the function
+	handler := http.HandlerFunc(InsertProductEndpoint)
+
+	// Tell the handler serve the http request and with what
+	handler.ServeHTTP(rr, req)
+
+	// See if the proper status code was returned
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("insert test returned a bad status code: GOT %v WANTED %v",
+			status, http.StatusOK)
+	}
 }
 
 func TestInsertProductEndpoint(t *testing.T) {
@@ -16,8 +41,8 @@ func TestInsertProductEndpoint(t *testing.T) {
 	// Byte test string for insert
 	var testInsertBuffer = []byte(`{
 		"productid":"123", 
-		"productprice": "10.99",
-		"productcurrency": "USD"
+		"productprice":"11.99",
+		"productcurrency":"USD"
 	}`)
 
 	// Create a new request
@@ -40,25 +65,60 @@ func TestInsertProductEndpoint(t *testing.T) {
 
 	// See if the proper status code was returned
 	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler return a bad status code: GOT %v WANTED %v",
+		t.Errorf("insert test returned a bad status code: GOT %v WANTED %v",
 			status, http.StatusOK)
 	}
 }
 
 func TestUpdateProductEndpoint(t *testing.T) {
 
+	// Byte test string for upate
+	var testUpdateBuffer = []byte(`{
+		"productprice":"99.99"
+	}`)
+
+	// Create a new request
+	req, err := http.NewRequest("PUT", "/product/123", bytes.NewBuffer(testUpdateBuffer))
+	if err != nil {
+		t.Fatal("new request for update test failed: ", err)
+	}
+
+	// Set the header so we know what we're dealing with
+	req.Header.Set("content-type", "application/json")
+
+	// Recorder to get the response
+	rr := httptest.NewRecorder()
+
+	// Handler is what's actually going to handle the call to the function
+	handler := http.HandlerFunc(UpdateProductEndpoint)
+
+	// Tell the handler serve the http request and with what
+	handler.ServeHTTP(rr, req)
+
+	// See if the proper status code was returned
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("update test returned a bad status code: GOT %v WANTED %v",
+			status, http.StatusOK)
+	}
 }
 
-func TestProductNameEndpoint(t *testing.T) {
+func ProductNameEndpoint(t *testing.T) {
 
-	id := "12345"
+	// Id we're looking for
+	id := "13860428"
 
+	// Allocate a new product
 	product := new(Product)
 
+	// Hit the endpoint
 	product.ProductNameEndpoint(id)
 
-	if expected := "The Big Lebowski (Blu-ray)"; product.Productid != expected {
-		t.Errorf("product name endpoint failed: GOT %v, WANTED %v",
+	// We definitely know what we're looking for
+	expected := "The Big Lebowski (Blu-ray)"
+
+	// Check if we got what we wanted
+	if expected != product.Productname {
+		t.Errorf("product name endpoint failed: GOT `%v`, WANTED `%v`",
 			product.Productname, expected)
 	}
 }

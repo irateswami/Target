@@ -36,7 +36,7 @@ func TestGetProductEndpoint(t *testing.T) {
 	}
 }
 
-func TestInsertProductEndpoint(t *testing.T) {
+func TestInsertDeleteProductEndpoint(t *testing.T) {
 
 	// Byte test string for insert
 	var testInsertBuffer = []byte(`{
@@ -45,7 +45,7 @@ func TestInsertProductEndpoint(t *testing.T) {
 		"productcurrency":"USD"
 	}`)
 
-	// Create a new request
+	// Create a new insert request
 	req, err := http.NewRequest("POST", "/product/123", bytes.NewBuffer(testInsertBuffer))
 	if err != nil {
 		t.Fatal("new request for insert test failed: ", err)
@@ -68,6 +68,28 @@ func TestInsertProductEndpoint(t *testing.T) {
 		t.Errorf("insert test returned a bad status code: GOT %v WANTED %v",
 			status, http.StatusOK)
 	}
+
+	// Create a new delete request for what we just inserted
+	req, err = http.NewRequest("DELETE", "/product/123", nil)
+	if err != nil {
+		t.Fatal("new request for delete test failed: ", err)
+	}
+
+	// Set the header again
+	req.Header.Set("content-type", "application/json")
+
+	// New recorder
+	rr = httptest.NewRecorder()
+
+	// New handler
+	handler = http.HandlerFunc(DeleteProductEndpoint)
+
+	// Serve it up once again
+	handler.ServeHTTP(rr, req)
+	if err != nil {
+		t.Fatal("delete test returned a bad status code: ", err)
+	}
+
 }
 
 func TestUpdateProductEndpoint(t *testing.T) {

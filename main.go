@@ -161,6 +161,7 @@ func UpdateProductEndpoint(response http.ResponseWriter, request *http.Request) 
 	// Grab the new price
 	price := product.Productprice
 
+	// Do some bson magic
 	update := bson.M{"$set": bson.M{"productprice": price}}
 
 	// Establish the db and collection we're going to use
@@ -179,6 +180,33 @@ func UpdateProductEndpoint(response http.ResponseWriter, request *http.Request) 
 	}
 }
 
+func DeleteProductEndpoint(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("DeleteProduct called")
+
+	// Set the header
+	response.Header().Set("content-type", "application/json")
+
+	// Grab the params passed
+	params := mux.Vars(request)
+
+	// Grab the id from the params
+	id := params["id"]
+
+	// Define our db collection
+	collection := client.Database("target").Collection("products")
+
+	// Set a timeout and defer
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Try to delete, error out if something went wrong
+	_, err := collection.DeleteOne(ctx, bson.M{"productid": id})
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message: " ` + err.Error() + `" }`))
+	}
+}
+
 func main() {
 
 	// Create a router through which traffic will flow
@@ -188,6 +216,7 @@ func main() {
 	router.HandleFunc("/product/{id}", InsertProductEndpoint).Methods("POST")
 	router.HandleFunc("/product/{id}", GetProductEndpoint).Methods("GET")
 	router.HandleFunc("/product/{id}", UpdateProductEndpoint).Methods("PUT")
+	router.HandleFunc("/product/{id}", DeleteProductEndpoint).Methods("DELETE")
 
 	// Serve up everything on port 8080
 	http.ListenAndServe(":8080", router)

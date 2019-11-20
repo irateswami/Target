@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -18,27 +19,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Because we have one example and I'm not totally sure on how the api url string is constructed, this will just be a constant. In the real world this would be constructed via arguments.
-var redskyURL string
-
-// Mongo db client is going to be use a lot of places, and there's only one db we're hitting, so make it gobal
-var client *mongo.Client
-
-func init() {
-
-	redskyURL = "https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics"
-
-	var err error
-
-	// Get our api address to hit, here we're using a local mongodb docker container
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-
-	// Try to connect and if failure, let me know
-	client, err = mongo.Connect(context.Background(), clientOptions)
-	if err != nil {
-		log.Fatal("db didn't connect: ", err)
-	}
-}
+var (
+	configs Configs
+	client  *mongo.Client
+)
 
 type Product struct {
 	ID              primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
@@ -48,11 +32,42 @@ type Product struct {
 	ProductCurrency string             `json:"productcurrency,omitempty" bson:"productcurrency,omitempty"`
 }
 
+type Configs struct {
+	APIURL string `json:"apiurl"`
+	DBURL  string `json:"dburl"`
+}
+
+func init() {
+
+	// Grab the configs
+	configsFile, err := os.Open("configs.json")
+	defer configsFile.Close()
+	if err != nil {
+		log.Fatal("configs weren't found: ", err)
+	}
+
+	bytesFileIn, err := ioutil.ReadAll(configsFile)
+	if err != nil {
+		log.Fatal("config file wasn't read in properly: ", err)
+	}
+
+	json.Unmarshal(bytesFileIn, &configs)
+
+	// Get our api address to hit, here we're using a local mongodb docker container
+	clientOptions := options.Client().ApplyURI(configs.DBURL)
+
+	// Try to connect and if failure, let me know
+	client, err = mongo.Connect(context.Background(), clientOptions)
+	if err != nil {
+		log.Fatal("db didn't connect: ", err)
+	}
+}
+
 func (p *Product) ProductNameEndpoint(id string) {
 	fmt.Println("ProductName called")
 
 	// Construct http request to the product info api. In this case the api address is a string constant, but in the real world this would be constructed via another function
-	response, err := http.Get(redskyURL)
+	response, err := http.Get(configs.APIURL)
 	if err != nil {
 		log.Fatal("product information api request failed: ", err)
 	}
@@ -99,7 +114,7 @@ func GetProductEndpoint(response http.ResponseWriter, request *http.Request) {
 
 	// Try finding the product by it's product id
 	err := collection.FindOne(ctx, Product{Productid: id}).Decode(&product)
-	product.ProductNameEndpoint(redskyURL)
+	product.ProductNameEndpoint(configs.APIURL)
 	if err != nil {
 		response.WriteHeader(http.StatusInternalServerError)
 		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))

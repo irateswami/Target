@@ -1,4 +1,5 @@
 {
-    "apirl":"https://redsky.target.com/v2/pdp/tcin/13860428?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics",
+    "nameurlbegin":"https://redsky.target.com/v2/pdp/tcin/",
+    "nameurlend":"?excludes=taxonomy,price,promotion,bulk_ship,rating_and_review_reviews,rating_and_review_statistics,question_answer_statistics",
     "dburl": "mongodb://localhost:27017"
 }

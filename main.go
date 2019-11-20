@@ -33,8 +33,10 @@ type Product struct {
 }
 
 type Configs struct {
-	APIURL string `json:"apiurl"`
-	DBURL  string `json:"dburl"`
+	NAMEURLBEGIN string `json:"nameurlbegin"`
+	NAMEURLEND   string `json:"nameurlend"`
+	DBURL        string `json:"dburl"`
+	NAMEURL      string
 }
 
 func init() {
@@ -66,8 +68,11 @@ func init() {
 func (p *Product) ProductNameEndpoint(id string) {
 	fmt.Println("ProductName called")
 
-	// Construct http request to the product info api. In this case the api address is a string constant, but in the real world this would be constructed via another function
-	response, err := http.Get(configs.APIURL)
+	// Construct the url to grab the name of the product
+	configs.NAMEURL = configs.NAMEURLBEGIN + id + configs.NAMEURLEND
+
+	// Construct http request to the product name
+	response, err := http.Get(configs.NAMEURL)
 	if err != nil {
 		log.Fatal("product information api request failed: ", err)
 	}
@@ -114,7 +119,7 @@ func GetProductEndpoint(response http.ResponseWriter, request *http.Request) {
 
 	// Try finding the product by it's product id
 	err := collection.FindOne(ctx, Product{Productid: id}).Decode(&product)
-	product.ProductNameEndpoint(configs.APIURL)
+	product.ProductNameEndpoint(id)
 	if err != nil {
 		response.WriteHeader(http.StatusInternalServerError)
 		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
